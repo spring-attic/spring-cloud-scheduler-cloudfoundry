@@ -1,6 +1,8 @@
 == Spring Cloud Scheduler Cloud Foundry image:https://build.spring.io/plugins/servlet/wittified/build-status/SCD-SMC[Build Status, link=https://build.spring.io/browse/SCD-SMC] image:https://badge.waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry.svg?label=ready&title=Ready[Stories Ready, link=http://waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry] image:https://badge.waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry.svg?label=In%20Progress&title=In%20Progress[Stories In Progress, link=http://waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry]
 
-The Spring Cloud Scheduler Cloud Foundry project provides a means to schedule short lived tasks to Cloud Foundry based on the Spring Cloud Deployer SPI.
+The Spring Cloud Scheduler Cloud Foundry project provides a means to schedule short lived tasks to Cloud Foundry based on the Spring Cloud Scheduler SPI.
+
+
 
 === Building
 
@@ -10,3 +12,32 @@ Clone the repo and type
 $ ./mvnw clean install
 ----
 
+
+Below is a short list of common Spring Boot `@ConfigurationProperties` (in environment variable format) that you will
+need to set in order to deploy applications to Cloud Foundry:
+
+----
+# url of the CF API (used when using cf login -a for example)
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_URL
+
+# name of the space into which modules will be deployed
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_SPACE
+
+# name of the organization that owns the space above
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_ORG
+
+# the root domain to use when mapping routes
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_DOMAIN
+
+# Comma separated set of service instance names to bind to the deployed app
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_SERVICES
+
+# username and password of the user to use to create apps
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_USERNAME
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_PASSWORD
+
+# whether to allow self-signed certificates during SSL validation
+SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_SKIP_SSL_VALIDATION
+----
+
+Refer to `CloudFoundryConnectionProperties.java` for a complete listing.
