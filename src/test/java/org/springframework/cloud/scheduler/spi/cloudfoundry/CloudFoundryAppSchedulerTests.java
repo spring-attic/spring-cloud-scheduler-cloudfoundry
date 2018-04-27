@@ -21,10 +21,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import io.pivotal.scheduler.SchedulerClient;
-import io.pivotal.scheduler.v1.ExpressionType;
+import io.pivotal.scheduler.v1.Pagination;
 import io.pivotal.scheduler.v1.calls.Calls;
 import io.pivotal.scheduler.v1.jobs.CreateJobRequest;
 import io.pivotal.scheduler.v1.jobs.CreateJobResponse;
@@ -34,8 +35,8 @@ import io.pivotal.scheduler.v1.jobs.ExecuteJobRequest;
 import io.pivotal.scheduler.v1.jobs.ExecuteJobResponse;
 import io.pivotal.scheduler.v1.jobs.GetJobRequest;
 import io.pivotal.scheduler.v1.jobs.GetJobResponse;
-import io.pivotal.scheduler.v1.jobs.JobResource;
-import io.pivotal.scheduler.v1.jobs.JobScheduleResource;
+import io.pivotal.scheduler.v1.jobs.Job;
+import io.pivotal.scheduler.v1.jobs.JobSchedule;
 import io.pivotal.scheduler.v1.jobs.Jobs;
 import io.pivotal.scheduler.v1.jobs.ListJobHistoriesRequest;
 import io.pivotal.scheduler.v1.jobs.ListJobHistoriesResponse;
@@ -47,6 +48,7 @@ import io.pivotal.scheduler.v1.jobs.ListJobsRequest;
 import io.pivotal.scheduler.v1.jobs.ListJobsResponse;
 import io.pivotal.scheduler.v1.jobs.ScheduleJobRequest;
 import io.pivotal.scheduler.v1.jobs.ScheduleJobResponse;
+import io.pivotal.scheduler.v1.schedules.ExpressionType;
 import org.cloudfoundry.client.CloudFoundryClient;
 import org.cloudfoundry.client.v3.applications.ApplicationsV3;
 import org.cloudfoundry.client.v3.tasks.Tasks;
@@ -67,7 +69,9 @@ import reactor.core.publisher.Mono;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDefinition;
+import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
+import org.springframework.cloud.scheduler.spi.core.SchedulerException;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
@@ -111,9 +115,10 @@ public class CloudFoundryAppSchedulerTests {
 
 	private CloudFoundryConnectionProperties properties = new CloudFoundryConnectionProperties();
 
+	private CloudFoundrySchedulerProperties schedulerProperties = new CloudFoundrySchedulerProperties();
 
 	@Before
-	public void setUp(){
+	public void setUp() {
 		MockitoAnnotations.initMocks(this);
 		given(this.cloudFoundryClient.applicationsV3()).willReturn(this.applicationsV3);
 		given(this.cloudFoundryClient.tasks()).willReturn(this.tasks);
@@ -127,7 +132,7 @@ public class CloudFoundryAppSchedulerTests {
 		this.client = new TestSchedulerClient();
 
 		this.cloudFoundryAppScheduler = new CloudFoundryAppScheduler(this.client, this.operations,
-				this.properties, taskLauncher);
+				this.properties, taskLauncher, schedulerProperties);
 	}
 
 	@Test(expected = IllegalArgumentException.class)
@@ -170,25 +175,90 @@ public class CloudFoundryAppSchedulerTests {
 		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getCommand()).isEqualTo("TestArg");
 	}
 
-	@Test(expected = UnsupportedOperationException.class)
+	@Test
 	public void testList() {
-		this.cloudFoundryAppScheduler.list();
+		setupMockResults();
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
+		assertThat(result.size()).isEqualTo(2);
+		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", DEFAULT_CRON_EXPRESSION);
+		verifyScheduleInfo(result.get(1), "test-application-2", "test-job-name-2", DEFAULT_CRON_EXPRESSION);
 	}
 
-	@Test(expected = UnsupportedOperationException.class)
-	public void testFilteredList() {
-		this.cloudFoundryAppScheduler.list("FOO");
+	@Test
+	public void testListWithJobsNoAssociatedSchedule() {
+		setupMockResultsNoScheduleForJobs();
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
+		assertThat(result.size()).isEqualTo(2);
+		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", null);
+		verifyScheduleInfo(result.get(1), "test-application-2", "test-job-name-2", null);
 	}
 
-	@Test(expected = UnsupportedOperationException.class)
+	@Test
+	public void testListWithNoSchedules() {
+		given(this.operations.applications()
+				.list())
+				.willReturn(Flux.empty());
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
+		assertThat(result.size()).isEqualTo(0);
+	}
+
+	@Test
+	public void testListSchedulesWithAppName() {
+		setupMockResults();
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("test-application-2");
+		assertThat(result.size()).isEqualTo(1);
+		verifyScheduleInfo(result.get(0), "test-application-2", "test-job-name-2", DEFAULT_CRON_EXPRESSION);
+	}
+
+	@Test
+	public void testListSchedulesWithInvalidAppName() {
+		setupMockResults();
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("not-here");
+		assertThat(result.size()).isEqualTo(0);
+	}
+
+	@Test
 	public void testUnschedule() {
-		this.cloudFoundryAppScheduler.unschedule("FOO");
+		setupMockResults();
+		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
+		assertThat(result.size()).isEqualTo(2);
+		this.cloudFoundryAppScheduler.unschedule("test-job-name-1");
+		result = this.cloudFoundryAppScheduler.list();
+		assertThat(result.size()).isEqualTo(1);
+		assertThat(result.get(0).getScheduleName()).isEqualTo("test-job-name-2");
+		assertThat(result.get(0).getTaskDefinitionName()).isEqualTo("test-application-2");
+	}
+
+	@Test
+	public void testMissingScheduleDelete() {
+		boolean exceptionFired = false;
+		setupMockResults();
+		try {
+			this.cloudFoundryAppScheduler.unschedule("test-job-name-3");
+		}
+		catch (SchedulerException se) {
+			assertThat(se.getMessage()).isEqualTo("Failed to unschedule task. test-job-name-3, was not found");
+			exceptionFired = true;
+		}
+		assertThat(exceptionFired).isTrue();
 	}
 
 	private void givenRequestListApplications(Flux<ApplicationSummary> response) {
 		given(this.operations.applications()
 				.list())
 				.willReturn(response);
+	}
+
+	private void verifyScheduleInfo(ScheduleInfo scheduleInfo, String taskDefinitionName, String scheduleName, String expression) {
+		assertThat(scheduleInfo.getTaskDefinitionName()).isEqualTo(taskDefinitionName);
+		assertThat(scheduleInfo.getScheduleName()).isEqualTo(scheduleName);
+		if (expression != null) {
+			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(1);
+			assertThat(scheduleInfo.getScheduleProperties().get(CRON_EXPRESSION)).isEqualTo(expression);
+		}
+		else {
+			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(0);
+		}
 	}
 
 	private static class TestSchedulerClient implements SchedulerClient {
@@ -212,9 +282,9 @@ public class CloudFoundryAppSchedulerTests {
 	private static class TestJobs implements Jobs {
 		private CreateJobResponse createJobResponse;
 
-		private List<JobResource> jobResources = new ArrayList<>();
+		private List<Job> jobResources = new ArrayList<>();
 
-		private List<JobScheduleResource> jobScheduleResources = new ArrayList<>();
+		private List<JobSchedule> jobScheduleResources = new ArrayList<>();
 
 		@Override
 		public Mono<CreateJobResponse> create(CreateJobRequest request) {
@@ -257,6 +327,7 @@ public class CloudFoundryAppSchedulerTests {
 		public Mono<ListJobsResponse> list(ListJobsRequest request) {
 			ListJobsResponse response = ListJobsResponse.builder()
 					.addAllResources(jobResources)
+					.pagination(Pagination.builder().totalPages(1).build())
 					.build();
 			return Mono.just(response);
 		}
@@ -303,7 +374,11 @@ public class CloudFoundryAppSchedulerTests {
 
 	private void setupMockResults() {
 		mockJobsInJobList();
-		addMockSchedulesToMockJobs();
+		mockAppResultsInAppList();
+	}
+
+	private void setupMockResultsNoScheduleForJobs() {
+		mockJobsInJobListNoSchedule();
 		mockAppResultsInAppList();
 	}
 
@@ -328,36 +403,46 @@ public class CloudFoundryAppSchedulerTests {
 						.build()));
 	}
 
-	private void mockJobsInJobList() {
+	private void mockJobsInJobListNoSchedule() {
 		TestJobs localJobs = (TestJobs) client.jobs();
-		localJobs.jobResources.add(JobResource.builder().applicationId("test-application-id-1")
+		localJobs.jobResources.add(Job.builder().applicationId("test-application-id-1")
 				.command("test-command")
 				.id("test-job-1")
 				.name("test-job-name-1")
 				.build());
-		localJobs.jobResources.add(JobResource.builder().applicationId("test-application-id-2")
+		localJobs.jobResources.add(Job.builder().applicationId("test-application-id-2")
 				.command("test-command")
 				.id("test-job-2")
 				.name("test-job-name-2")
 				.build());
 	}
 
-	private void addMockSchedulesToMockJobs() {
+	private void mockJobsInJobList() {
 		TestJobs localJobs = (TestJobs) client.jobs();
-		localJobs.jobScheduleResources.add(JobScheduleResource.builder()
+		localJobs.jobResources.add(Job.builder().applicationId("test-application-id-1")
+				.command("test-command")
+				.id("test-job-1")
+				.name("test-job-name-1")
+				.jobSchedules(createJobScheduleList("test-job-1", "test-schedule-1"))
+				.build());
+		localJobs.jobResources.add(Job.builder().applicationId("test-application-id-2")
+				.command("test-command")
+				.id("test-job-2")
+				.name("test-job-name-2")
+				.jobSchedules(createJobScheduleList("test-job-2", "test-schedule-2"))
+				.build());
+	}
+
+	private List<JobSchedule> createJobScheduleList(String jobId, String scheduleId) {
+		List<JobSchedule> jobSchedules = new ArrayList<>();
+		jobSchedules.add(JobSchedule.builder()
 				.enabled(true)
 				.expression(DEFAULT_CRON_EXPRESSION)
 				.expressionType(ExpressionType.CRON)
-				.id("test-schedule-1")
-				.jobId("test-job-1")
+				.id(scheduleId)
+				.jobId(jobId)
 				.build());
-		localJobs.jobScheduleResources.add(JobScheduleResource.builder()
-				.enabled(true)
-				.expression(DEFAULT_CRON_EXPRESSION)
-				.expressionType(ExpressionType.CRON)
-				.id("test-schedule-2")
-				.jobId("test-job-2")
-				.build());
+		return jobSchedules;
 	}
 
 	private Map<String, String> getDefaultScheduleProperties() {

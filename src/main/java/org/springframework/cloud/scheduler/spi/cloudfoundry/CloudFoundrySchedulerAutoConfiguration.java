@@ -23,7 +23,6 @@ import org.cloudfoundry.reactor.TokenProvider;
 import reactor.core.publisher.Mono;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
@@ -58,10 +57,13 @@ public class CloudFoundrySchedulerAutoConfiguration {
 	public Scheduler scheduler(ReactorSchedulerClient client,
 			CloudFoundryOperations operations,
 			CloudFoundryConnectionProperties properties,
-			TaskLauncher taskLauncher) {
+			TaskLauncher taskLauncher,
+			CloudFoundrySchedulerProperties schedulerProperties) {
 		return new CloudFoundryAppScheduler(client, operations, properties,
-				(CloudFoundry2630AndLaterTaskLauncher)taskLauncher);
+				(CloudFoundry2630AndLaterTaskLauncher) taskLauncher,
+				schedulerProperties);
 	}
+
 	@Bean
 	@ConditionalOnMissingBean
 	public CloudFoundrySchedulerProperties cloudFoundrySchedulerProperties() {
