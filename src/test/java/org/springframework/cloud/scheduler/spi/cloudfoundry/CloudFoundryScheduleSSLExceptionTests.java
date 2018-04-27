@@ -21,26 +21,31 @@ import org.junit.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Validate the basic behavior of the {@link CloudFoundrySchedulerProperties}.
+ * Verify that {@linkCloudFoundryScheduleSSLException} has the expected behavior.
  *
  * @author Glenn Renfro
  */
-public class CloudFoundrySchedulerPropertiesTest {
+public class CloudFoundryScheduleSSLExceptionTests {
 
 	@Test
-	public void testProperties() {
-		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
-		props.setSchedulerUrl("testProperty");
-		props.setScheduleSSLRetryCount(10);
-		assertThat(props.getSchedulerUrl()).isEqualTo("testProperty");
-		assertThat(props.getScheduleSSLRetryCount()).isEqualTo(10);
+	public void testExceptionMessageOnly() {
+		try {
+			throw new CloudFoundryScheduleSSLException("oops");
+		}
+		catch (CloudFoundryScheduleSSLException cfe) {
+			assertThat(cfe.getMessage()).isEqualTo("oops");
+		}
 	}
 
 	@Test
-	public void testEmptyProperties() {
-		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
-		assertThat(props.getSchedulerUrl()).isNull();
-		assertThat(props.getScheduleSSLRetryCount()).isEqualTo(5);
+	public void testExceptionMessageWithException() {
+		RuntimeException rte = new RuntimeException("RTE");
+		try {
+			throw new CloudFoundryScheduleSSLException("oops", rte);
+		}
+		catch (CloudFoundryScheduleSSLException cfe) {
+			assertThat(cfe.getMessage()).isEqualTo("oops");
+			assertThat(cfe.getCause()).isEqualTo(rte);
+		}
 	}
-
 }

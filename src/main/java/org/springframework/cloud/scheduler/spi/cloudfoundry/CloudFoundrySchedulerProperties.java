@@ -41,6 +41,11 @@ public class CloudFoundrySchedulerProperties {
 	@NotNull
 	private String schedulerUrl;
 
+	/**
+	 * The number of retries allowed when scheduling a task if an {@link javax.net.ssl.SSLException} is thrown.
+	 */
+	private int scheduleSSLRetryCount = 5;
+
 
 	public String getSchedulerUrl() {
 		return schedulerUrl;
@@ -50,4 +55,11 @@ public class CloudFoundrySchedulerProperties {
 		this.schedulerUrl = schedulerUrl;
 	}
 
+	public int getScheduleSSLRetryCount() {
+		return scheduleSSLRetryCount;
+	}
+
+	public void setScheduleSSLRetryCount(int scheduleSSLRetryCount) {
+		this.scheduleSSLRetryCount = scheduleSSLRetryCount;
+	}
 }
