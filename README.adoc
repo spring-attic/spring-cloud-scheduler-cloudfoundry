@@ -2,8 +2,6 @@
 
 The Spring Cloud Scheduler Cloud Foundry project provides a means to schedule short lived tasks to Cloud Foundry based on the Spring Cloud Scheduler SPI.
 
-
-
 === Building
 
 Clone the repo and type
@@ -11,7 +9,6 @@ Clone the repo and type
 ----
 $ ./mvnw clean install
 ----
-
 
 Below is a short list of common Spring Boot `@ConfigurationProperties` (in environment variable format) that you will
 need to set in order to deploy applications to Cloud Foundry:

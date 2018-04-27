@@ -18,7 +18,11 @@ package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.pivotal.scheduler.SchedulerClient;
 import io.pivotal.scheduler.v1.ExpressionType;
@@ -56,6 +60,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Answers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -67,6 +72,18 @@ import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
+import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
+import org.springframework.cloud.deployer.spi.core.AppDefinition;
+import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
+import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
+import org.springframework.cloud.scheduler.spi.core.SchedulerException;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys.CRON_EXPRESSION;
 
 /**
  * Test the core features of the Spring Cloud Scheduler implementation.
@@ -95,6 +112,9 @@ public class CloudFoundryAppSchedulerTests {
 	@Mock(answer = Answers.RETURNS_SMART_NULLS)
 	private Tasks tasks;
 
+	@Mock(answer = Answers.RETURNS_SMART_NULLS)
+	private CloudFoundry2630AndLaterTaskLauncher taskLauncher;
+
 	private CloudFoundryAppScheduler cloudFoundryAppScheduler;
 
 	private SchedulerClient client;
@@ -117,13 +137,12 @@ public class CloudFoundryAppSchedulerTests {
 		this.client = new TestSchedulerClient();
 
 		this.cloudFoundryAppScheduler = new CloudFoundryAppScheduler(this.client, this.operations,
-				this.properties);
+				this.properties, taskLauncher);
 	}
 
 	@Test
 	public void testDelete() {
-		mockAppResultsInAppList();
-		mockSingleJobInJobList();
+		setupMockResults();
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
 		assertThat(result.size()).isEqualTo(2);
 
@@ -138,8 +157,7 @@ public class CloudFoundryAppSchedulerTests {
 	@Test
 	public void testMissingScheduleDelete() {
 		boolean exceptionFired = false;
-		mockAppResultsInAppList();
-		mockSingleJobInJobList();
+		setupMockResults();
 		try {
 			this.cloudFoundryAppScheduler.unschedule("test-job-name-3");
 		}
@@ -158,9 +176,7 @@ public class CloudFoundryAppSchedulerTests {
 
 	@Test
 	public void testListSchedules() {
-		mockSingleJobInJobList();
-		mockSingleSchedule();
-		mockAppResultsInAppList();
+		setupMockResults();
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
 		assertThat(result.size()).isEqualTo(2);
 		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", DEFAULT_CRON_EXPRESSION);
@@ -169,9 +185,7 @@ public class CloudFoundryAppSchedulerTests {
 
 	@Test
 	public void testListSchedulesWithAppName() {
-		mockSingleJobInJobList();
-		mockSingleSchedule();
-		mockAppResultsInAppList();
+		setupMockResults();
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("test-application-2");
 		assertThat(result.size()).isEqualTo(1);
 		verifyScheduleInfo(result.get(0), "test-application-2", "test-job-name-2", DEFAULT_CRON_EXPRESSION);
@@ -179,22 +193,61 @@ public class CloudFoundryAppSchedulerTests {
 
 	@Test
 	public void testListSchedulesWithInvalidAppName() {
-		mockSingleJobInJobList();
-		mockSingleSchedule();
-		mockAppResultsInAppList();
+		setupMockResults();
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("not-here");
 		assertThat(result.size()).isEqualTo(0);
 	}
 
 	@Test
 	public void testListScheduleNoExpression() {
-		mockSingleJobInJobList();
+		mockJobsInJobList();
 		mockAppResultsInAppList();
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
 		assertThat(result.size()).isEqualTo(2);
 		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", null);
 		verifyScheduleInfo(result.get(1), "test-application-2", "test-job-name-2", null);
 	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void testEmptySchedulerProperties() {
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+		AppDefinition definition = new AppDefinition("bar", null);
+		ScheduleRequest request = new ScheduleRequest(definition, null, null, null, resource);
+		this.cloudFoundryAppScheduler.schedule(request);
+	}
+
+	@Test
+	public void testCreateNoCommandLineArgs() {
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+
+		mockAppResultsInAppList();
+		AppDefinition definition = new AppDefinition("test-application-1", null);
+		ScheduleRequest request = new ScheduleRequest(definition, getDefaultScheduleProperties(), null, "test-schedule", resource);
+
+		this.cloudFoundryAppScheduler.schedule(request);
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getId()).isEqualTo("test-job-id-1");
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getApplicationId()).isEqualTo("test-application-id-1");
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getCommand()).isEmpty();
+	}
+
+	@Test
+	public void testCreateWithCommandLineArgs() {
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+
+		mockAppResultsInAppList();
+		AppDefinition definition = new AppDefinition("test-application-1", null);
+		ScheduleRequest request = new ScheduleRequest(definition,
+				getDefaultScheduleProperties(), null,
+				Collections.singletonList("TestArg"), "test-schedule", resource);
+		given(this.taskLauncher.getCommand(Mockito.any(), Mockito.any()))
+				.willReturn("TestArg");
+
+		this.cloudFoundryAppScheduler.schedule(request);
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getId()).isEqualTo("test-job-id-1");
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getApplicationId()).isEqualTo("test-application-id-1");
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getCommand()).isEqualTo("TestArg");
+	}
+
 
 	private void givenRequestListApplications(Flux<ApplicationSummary> response) {
 		given(this.operations.applications()
@@ -231,9 +284,9 @@ public class CloudFoundryAppSchedulerTests {
 		public Mono<CreateJobResponse> create(CreateJobRequest request) {
 			this.createJobResponse = CreateJobResponse.builder()
 					.applicationId(request.getApplicationId())
-					.command(request.getCommand())
 					.name(request.getName())
 					.id("test-job-id-1")
+					.command(request.getCommand())
 					.build();
 			return Mono.just(createJobResponse);
 		}
@@ -286,7 +339,7 @@ public class CloudFoundryAppSchedulerTests {
 		public Mono<ListJobSchedulesResponse> listSchedules(ListJobSchedulesRequest request) {
 
 			ListJobSchedulesResponse response = ListJobSchedulesResponse.builder()
-					.addAllResources(jobScheduleResources)
+					.addAllResources(jobScheduleResources.stream().filter(jobScheduleResource -> jobScheduleResource.getJobId().equals(request.getJobId())).collect(Collectors.toList()))
 					.build();
 			return Mono.just(response);
 		}
@@ -301,12 +354,21 @@ public class CloudFoundryAppSchedulerTests {
 					.build());
 		}
 
+		public CreateJobResponse getCreateJobResponse() {
+			return createJobResponse;
+		}
 	}
 
 	private Flux<SpaceSummary> getTestSpaces() {
 		return Flux.just(SpaceSummary.builder().id("test-space-1")
 				.name("test-space")
 				.build());
+	}
+
+	private void setupMockResults() {
+		mockJobsInJobList();
+		addMockSchedulesToMockJobs();
+		mockAppResultsInAppList();
 	}
 
 	private void mockAppResultsInAppList() {
@@ -330,7 +392,7 @@ public class CloudFoundryAppSchedulerTests {
 						.build()));
 	}
 
-	private void mockSingleJobInJobList() {
+	private void mockJobsInJobList() {
 		TestJobs localJobs = (TestJobs) client.jobs();
 		localJobs.jobResources.add(JobResource.builder().applicationId("test-application-id-1")
 				.command("test-command")
@@ -344,7 +406,7 @@ public class CloudFoundryAppSchedulerTests {
 				.build());
 	}
 
-	private void mockSingleSchedule() {
+	private void addMockSchedulesToMockJobs() {
 		TestJobs localJobs = (TestJobs) client.jobs();
 		localJobs.jobScheduleResources.add(JobScheduleResource.builder()
 				.enabled(true)
@@ -353,6 +415,13 @@ public class CloudFoundryAppSchedulerTests {
 				.id("test-schedule-1")
 				.jobId("test-job-1")
 				.build());
+		localJobs.jobScheduleResources.add(JobScheduleResource.builder()
+				.enabled(true)
+				.expression(DEFAULT_CRON_EXPRESSION)
+				.expressionType(ExpressionType.CRON)
+				.id("test-schedule-2")
+				.jobId("test-job-2")
+				.build());
 	}
 
 	private void verifyScheduleInfo(ScheduleInfo scheduleInfo, String taskDefinitionName, String scheduleName, String expression) {
@@ -360,9 +429,16 @@ public class CloudFoundryAppSchedulerTests {
 		assertThat(scheduleInfo.getScheduleName()).isEqualTo(scheduleName);
 		if(expression != null) {
 			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(1);
-			assertThat(scheduleInfo.getScheduleProperties().get(SchedulerPropertyKeys.CRON_EXPRESSION)).isEqualTo(expression);
+			assertThat(scheduleInfo.getScheduleProperties().get(CRON_EXPRESSION)).isEqualTo(expression);
 		} else {
 			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(0);
 		}
 	}
+
+	private Map<String, String> getDefaultScheduleProperties() {
+		Map result = new HashMap<String, String>();
+		result.put(CRON_EXPRESSION, DEFAULT_CRON_EXPRESSION);
+		return result;
+	}
+
 }

@@ -22,19 +22,26 @@ import java.util.NoSuchElementException;
 
 import io.jsonwebtoken.lang.Assert;
 import io.pivotal.scheduler.SchedulerClient;
+import io.pivotal.scheduler.v1.ExpressionType;
+import io.pivotal.scheduler.v1.jobs.CreateJobRequest;
 import io.pivotal.scheduler.v1.jobs.DeleteJobRequest;
 import io.pivotal.scheduler.v1.jobs.ListJobSchedulesRequest;
 import io.pivotal.scheduler.v1.jobs.ListJobSchedulesResponse;
 import io.pivotal.scheduler.v1.jobs.ListJobsRequest;
+import io.pivotal.scheduler.v1.jobs.ScheduleJobRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.cloudfoundry.client.v2.applications.SummaryApplicationResponse;
 import org.cloudfoundry.operations.CloudFoundryOperations;
+import org.cloudfoundry.operations.applications.AbstractApplicationSummary;
 import org.cloudfoundry.operations.applications.ApplicationSummary;
 import org.cloudfoundry.operations.spaces.SpaceSummary;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
+import org.springframework.cloud.deployer.spi.core.AppDeploymentRequest;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
@@ -42,7 +49,7 @@ import org.springframework.cloud.scheduler.spi.core.SchedulerException;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 
 /**
- * A Cloud Foundry implementation of the Scheduler interface
+ * A Cloud Foundry implementation of the Scheduler interface.
  *
  * @author Glenn Renfro
  */
@@ -54,21 +61,34 @@ public class CloudFoundryAppScheduler implements Scheduler {
 
 	private CloudFoundryConnectionProperties properties;
 
+	private CloudFoundry2630AndLaterTaskLauncher taskLauncher;
+
 	protected static final Log logger = LogFactory.getLog(CloudFoundryAppScheduler.class);
 
 	public CloudFoundryAppScheduler(SchedulerClient client, CloudFoundryOperations operations,
-			CloudFoundryConnectionProperties properties) {
+			CloudFoundryConnectionProperties properties, CloudFoundry2630AndLaterTaskLauncher taskLauncher) {
 		Assert.notNull(client, "client must not be null");
 		Assert.notNull(operations, "operations must not be null");
 		Assert.notNull(properties, "properties must not be null");
+		Assert.notNull(taskLauncher, "taskLauncher must not be null");
 
 		this.client = client;
 		this.operations = operations;
 		this.properties = properties;
+		this.taskLauncher = taskLauncher;
 	}
 
 	@Override
 	public void schedule(ScheduleRequest scheduleRequest) {
+		String appName = scheduleRequest.getDefinition().getName();
+		String jobName = scheduleRequest.getScheduleName();
+		String command = stageTask(scheduleRequest);
+
+		String cronExpression = scheduleRequest.getSchedulerProperties().get(SchedulerPropertyKeys.CRON_EXPRESSION);
+		Assert.hasText(cronExpression, String.format(
+				"request's scheduleProperties must have a %s that is not null nor empty",
+				SchedulerPropertyKeys.CRON_EXPRESSION));
+		scheduleJob(appName, jobName, cronExpression, command);
 	}
 
 	@Override
@@ -101,6 +121,46 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	public List<ScheduleInfo> list() {
 		return getSchedulesList()
 				.collectList()
+				.cache()
+				.block();
+	}
+
+
+	private Mono<ScheduleJobInfo> getJob(String scheduleName) {
+		return getJobsList().filter(scheduleInfo ->
+				scheduleInfo.getScheduleName().equals(scheduleName))
+				.single();
+	}
+
+	private Mono<ListJobSchedulesResponse> getScheduleExpression(String jobId) {
+		return this.client.jobs()
+				.listSchedules(
+						ListJobSchedulesRequest
+								.builder()
+								.jobId(jobId)
+								.build());
+	}
+
+	private void scheduleJob(String appName, String scheduleName, String expression, String command) {
+		getApplicationByAppName(appName)
+				.flatMap(abstractApplicationSummary -> {
+					return this.client.jobs().create(CreateJobRequest.builder()
+							.applicationId(abstractApplicationSummary.getId()) // App GUID
+							.command(command)
+							.name(scheduleName)
+							.build());
+				}).flatMap(createJobResponse -> {
+			return this.client.jobs().schedule(ScheduleJobRequest.
+					builder().
+					jobId(createJobResponse.getId()).
+					expression(expression).
+					expressionType(ExpressionType.CRON).
+					enabled(true).
+					build());
+		})
+				.onErrorMap(e -> {
+					throw new SchedulerException("Failed to schedule: " + scheduleName, e);
+				})
 				.cache()
 				.block();
 	}
@@ -152,20 +212,22 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				});
 	}
 
-	public Mono<ScheduleJobInfo> getJob(String scheduleName) {
-		return getJobsList().filter(scheduleInfo ->
-				scheduleInfo.getScheduleName().equals(scheduleName))
-				.single();
+	private String stageTask(ScheduleRequest scheduleRequest) {
+		AppDeploymentRequest request = new AppDeploymentRequest(
+				scheduleRequest.getDefinition(),
+				scheduleRequest.getResource(),
+				scheduleRequest.getDeploymentProperties());
+		SummaryApplicationResponse response = taskLauncher.stage(request);
+		return taskLauncher.getCommand(response, request);
 	}
 
-
-	public Mono<ListJobSchedulesResponse> getScheduleExpression(String jobId) {
-		return this.client.jobs()
-				.listSchedules(
-						ListJobSchedulesRequest
-								.builder()
-								.jobId(jobId)
-								.build());
+	private Mono<AbstractApplicationSummary> getApplicationByAppName(String appName) {
+		return requestListApplications()
+				.log()
+				.filter(application -> appName.equals(application.getName()))
+				.log()
+				.singleOrEmpty()
+				.cast(AbstractApplicationSummary.class);
 	}
 
 	private Mono<ApplicationSummary> getApplication(String appId) {

@@ -16,36 +16,28 @@
 
 package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
-import javax.validation.constraints.NotNull;
+import org.junit.Test;
 
-import org.springframework.validation.annotation.Validated;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Holds configuration properties for connecting to a Cloud Foundry Scheduler.
+ * Validate the basic behavior of the {@link CloudFoundrySchedulerProperties}.
  *
  * @author Glenn Renfro
  */
-@Validated
-public class CloudFoundrySchedulerProperties {
+public class CloudFoundrySchedulerPropertiesTest {
 
-	/**
-	 * Top level prefix for Cloud Foundry related configuration properties.
-	 */
-	public static final String CLOUDFOUNDRY_PROPERTIES = "spring.cloud.scheduler.cloudfoundry";
-
-	/**
-	 * Location of the PCF scheduler REST API enpoint ot use.
-	 */
-	@NotNull
-	private String schedulerUrl;
-
-
-	public String getSchedulerUrl() {
-		return schedulerUrl;
+	@Test
+	public void testProperties() {
+		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
+		props.setSchedulerUrl("testProperty");
+		assertThat(props.getSchedulerUrl()).isEqualTo("testProperty");
 	}
 
-	public void setSchedulerUrl(String schedulerUrl) {
-		this.schedulerUrl = schedulerUrl;
+	@Test
+	public void testEmptyProperties() {
+		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
+		assertThat(props.getSchedulerUrl()).isNull();
 	}
 
 }
