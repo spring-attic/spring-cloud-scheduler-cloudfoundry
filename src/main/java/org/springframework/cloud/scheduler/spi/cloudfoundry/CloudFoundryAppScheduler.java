@@ -160,7 +160,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					build());
 		})
 				.onErrorMap(e -> {
-					throw new CreateScheduleException("Failed to schedule: " + scheduleName, e);
+					throw new CreateScheduleException(scheduleName, e);
 				})
 				.cache()
 				.block();

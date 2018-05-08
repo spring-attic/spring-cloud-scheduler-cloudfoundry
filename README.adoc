@@ -10,6 +10,8 @@ Clone the repo and type
 $ ./mvnw clean install
 ----
 
+=== Configuration Properties
+
 Below is a short list of common Spring Boot `@ConfigurationProperties` (in environment variable format) that you will
 need to set in order to deploy applications to Cloud Foundry:
 
@@ -38,3 +40,14 @@ SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_SKIP_SSL_VALIDATION
 ----
 
 Refer to `CloudFoundryConnectionProperties.java` for a complete listing.
+
+=== Running Integration Tests
+By default the integration tests are skipped unless you have the configuration
+properties enumerated above in the environment along with the following:
+
+----
+# specifies the services required by the test app being deployed.
+# the minimum service required to be enumerated is the PCF-Scheduler-Service
+# for the configurated organization and space.
+spring.cloud.deployer.cloudfoundry.services
+----
