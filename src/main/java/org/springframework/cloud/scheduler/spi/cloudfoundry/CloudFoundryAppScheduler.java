@@ -42,6 +42,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDeploymentRequest;
+import org.springframework.cloud.scheduler.spi.core.CreateScheduleException;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
@@ -159,7 +160,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					build());
 		})
 				.onErrorMap(e -> {
-					throw new SchedulerException("Failed to schedule: " + scheduleName, e);
+					throw new CreateScheduleException("Failed to schedule: " + scheduleName, e);
 				})
 				.cache()
 				.block();
