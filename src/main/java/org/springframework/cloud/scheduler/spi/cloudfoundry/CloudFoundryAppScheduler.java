@@ -48,11 +48,11 @@ import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
  */
 public class CloudFoundryAppScheduler implements Scheduler {
 
-	private SchedulerClient client;
+	final private SchedulerClient client;
 
-	private CloudFoundryOperations operations;
+	final private CloudFoundryOperations operations;
 
-	private CloudFoundryConnectionProperties properties;
+	final private CloudFoundryConnectionProperties properties;
 
 	protected static final Log logger = LogFactory.getLog(CloudFoundryAppScheduler.class);
 
@@ -69,6 +69,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 
 	@Override
 	public void schedule(ScheduleRequest scheduleRequest) {
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -76,44 +77,42 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		getJob(scheduleName).flatMap(scheduleJobInfo -> {
 			return this.client.jobs().delete(DeleteJobRequest.builder()
 					.jobId(scheduleJobInfo.getJobId())
-					.build());
-		})
+					.build()); })
 				.onErrorMap(e -> {
 					if (e instanceof NoSuchElementException) {
 						throw new SchedulerException(String.format("Failed to unschedule, schedule %s does not exist.", scheduleName), e);
 					}
-					throw new SchedulerException("Failed to unschedule: " + scheduleName, e);
-				})
-				.cache()
+					throw new SchedulerException("Failed to unschedule: " + scheduleName, e); })
 				.block();
 	}
 
 	@Override
 	public List<ScheduleInfo> list(String taskDefinitionName) {
-		return getSchedulesList().filter(scheduleInfo ->
+		return getSchedules().filter(scheduleInfo ->
 				scheduleInfo.getTaskDefinitionName().equals(taskDefinitionName))
 				.collectList()
-				.cache()
 				.block();
 	}
 
 	@Override
 	public List<ScheduleInfo> list() {
-		return getSchedulesList()
+		return getSchedules()
 				.collectList()
-				.cache()
 				.block();
 	}
 
-	private Flux<ScheduleJobInfo> getJobsList() {
-		return this.client.
-				jobs().
-				list(ListJobsRequest.builder()
-						.spaceId(getSpaceId(this.properties.getSpace()))
-						.build()) //Retrieve the ListJobResponse Mono
+	private Flux<ScheduleJobInfo> getJobs() {
+		Flux<ApplicationSummary> applicationSummaries = cacheAppSummaries();
+		return this.getSpace(this.properties.getSpace()).flatMap(requestSummary -> {
+			return this.client
+					.jobs()
+					.list(ListJobsRequest.builder()
+							.spaceId(requestSummary.getId())
+							.build()); })
 				.flatMapIterable(jobs -> jobs.getResources())// iterate over the resources returned.
 				.flatMap(job -> {
-					return getApplication(job.getApplicationId()) // get the application name for each job.
+					return getApplication(applicationSummaries,
+							job.getApplicationId()) // get the application name for each job.
 							.map(optionalApp -> {
 								ScheduleJobInfo scheduleJobInfo = new ScheduleJobInfo();
 								scheduleJobInfo.setScheduleProperties(new HashMap<>());
@@ -125,8 +124,8 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				});
 	}
 
-	private Flux<ScheduleInfo> getSchedulesList() {
-		return getJobsList()
+	private Flux<ScheduleInfo> getSchedules() {
+		return getJobs()
 				.flatMap(scheduleJobInfo -> { //iterate over each job and retrieve its schedule expression
 					return getScheduleExpression(scheduleJobInfo.getJobId())
 							.map(listJobSchedulesResponse -> {
@@ -153,7 +152,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	}
 
 	public Mono<ScheduleJobInfo> getJob(String scheduleName) {
-		return getJobsList().filter(scheduleInfo ->
+		return getJobs().filter(scheduleInfo ->
 				scheduleInfo.getScheduleName().equals(scheduleName))
 				.single();
 	}
@@ -168,10 +167,17 @@ public class CloudFoundryAppScheduler implements Scheduler {
 								.build());
 	}
 
-	private Mono<ApplicationSummary> getApplication(String appId) {
+	private Flux<ApplicationSummary> cacheAppSummaries() {
 		return requestListApplications()
+				.cache(); //cache results from first call.  No need to re-retrieve each time.
+	}
+
+	private Mono<ApplicationSummary> getApplication(Flux<ApplicationSummary> applicationSummaries,
+			String appId) {
+		return applicationSummaries
 				.filter(application -> appId.equals(application.getId()))
 				.singleOrEmpty();
+
 	}
 
 	private Flux<ApplicationSummary> requestListApplications() {
@@ -179,12 +185,9 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				.list();
 	}
 
-	private String getSpaceId(String spaceName) {
-		return getSpace(spaceName).cache().block().getId();
-	}
-
 	private Mono<SpaceSummary> getSpace(String spaceName) {
 		return requestSpaces()
+				.cache() //cache results from first call.
 				.filter(space -> spaceName.equals(space.getName()))
 				.singleOrEmpty()
 				.cast(SpaceSummary.class);

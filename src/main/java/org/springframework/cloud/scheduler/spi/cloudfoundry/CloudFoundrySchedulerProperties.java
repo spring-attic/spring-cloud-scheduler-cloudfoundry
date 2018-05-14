@@ -20,6 +20,7 @@ import java.net.URL;
 
 import javax.validation.constraints.NotNull;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -28,6 +29,7 @@ import org.springframework.validation.annotation.Validated;
  * @author Glenn Renfro
  */
 @Validated
+@ConfigurationProperties(prefix = CloudFoundrySchedulerProperties.CLOUDFOUNDRY_PROPERTIES)
 public class CloudFoundrySchedulerProperties {
 
 	/**

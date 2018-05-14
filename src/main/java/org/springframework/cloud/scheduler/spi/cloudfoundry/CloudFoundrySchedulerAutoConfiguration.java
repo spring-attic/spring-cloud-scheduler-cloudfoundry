@@ -62,7 +62,6 @@ public class CloudFoundrySchedulerAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	@ConfigurationProperties(prefix = CloudFoundrySchedulerProperties.CLOUDFOUNDRY_PROPERTIES)
 	public CloudFoundrySchedulerProperties cloudFoundrySchedulerProperties() {
 		return new CloudFoundrySchedulerProperties();
 	}

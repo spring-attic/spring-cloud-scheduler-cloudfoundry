@@ -45,7 +45,7 @@ import io.pivotal.scheduler.v1.jobs.ListJobsResponse;
 import io.pivotal.scheduler.v1.jobs.ScheduleJobRequest;
 import io.pivotal.scheduler.v1.jobs.ScheduleJobResponse;
 import org.cloudfoundry.client.CloudFoundryClient;
-import org.cloudfoundry.client.v2.applications.ApplicationsV2;
+import org.cloudfoundry.client.v3.applications.ApplicationsV3;
 import org.cloudfoundry.client.v3.tasks.Tasks;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.applications.ApplicationSummary;
@@ -87,7 +87,7 @@ public class CloudFoundryAppSchedulerTests {
 	private Spaces spaces;
 
 	@Mock(answer = Answers.RETURNS_SMART_NULLS)
-	private ApplicationsV2 applicationsV2;
+	private ApplicationsV3 applicationsV3;
 
 	@Mock(answer = Answers.RETURNS_SMART_NULLS)
 	private CloudFoundryClient cloudFoundryClient;
@@ -105,7 +105,7 @@ public class CloudFoundryAppSchedulerTests {
 	@Before
 	public void setUp() throws IOException {
 		MockitoAnnotations.initMocks(this);
-		given(this.cloudFoundryClient.applicationsV2()).willReturn(this.applicationsV2);
+		given(this.cloudFoundryClient.applicationsV3()).willReturn(this.applicationsV3);
 		given(this.cloudFoundryClient.tasks()).willReturn(this.tasks);
 		given(this.spaces.list()).willReturn(getTestSpaces());
 
@@ -152,6 +152,9 @@ public class CloudFoundryAppSchedulerTests {
 
 	@Test
 	public void testListWithNoSchedules() {
+		given(this.operations.applications()
+				.list())
+				.willReturn(Flux.empty());
 		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
 		assertThat(result.size()).isEqualTo(0);
 	}
