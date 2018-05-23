@@ -16,7 +16,6 @@
 
 package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,19 +64,10 @@ import org.mockito.MockitoAnnotations;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
-import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
-import org.springframework.cloud.scheduler.spi.core.SchedulerException;
-import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDefinition;
-import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
-import org.springframework.cloud.scheduler.spi.core.SchedulerException;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
@@ -123,7 +113,7 @@ public class CloudFoundryAppSchedulerTests {
 
 
 	@Before
-	public void setUp() throws IOException {
+	public void setUp(){
 		MockitoAnnotations.initMocks(this);
 		given(this.cloudFoundryClient.applicationsV3()).willReturn(this.applicationsV3);
 		given(this.cloudFoundryClient.tasks()).willReturn(this.tasks);
@@ -138,77 +128,6 @@ public class CloudFoundryAppSchedulerTests {
 
 		this.cloudFoundryAppScheduler = new CloudFoundryAppScheduler(this.client, this.operations,
 				this.properties, taskLauncher);
-	}
-
-	@Test
-	public void testDelete() {
-		setupMockResults();
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
-		assertThat(result.size()).isEqualTo(2);
-
-		this.cloudFoundryAppScheduler.unschedule("test-job-name-1");
-		result = this.cloudFoundryAppScheduler.list();
-		assertThat(result.size()).isEqualTo(1);
-
-		assertThat(result.get(0).getScheduleName()).isEqualTo("test-job-name-2");
-		assertThat(result.get(0).getTaskDefinitionName()).isEqualTo("test-application-2");
-	}
-
-	@Test
-	public void testMissingScheduleDelete() {
-		boolean exceptionFired = false;
-		setupMockResults();
-		try {
-			this.cloudFoundryAppScheduler.unschedule("test-job-name-3");
-		}
-		catch (SchedulerException se) {
-			assertThat(se.getMessage()).isEqualTo("Failed to unschedule, schedule test-job-name-3 does not exist.");
-			exceptionFired = true;
-		}
-		assertThat(exceptionFired).isTrue();
-	}
-
-	@Test
-	public void testListWithNoSchedules() {
-		given(this.operations.applications()
-				.list())
-				.willReturn(Flux.empty());
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
-		assertThat(result.size()).isEqualTo(0);
-	}
-
-	@Test
-	public void testListSchedules() {
-		setupMockResults();
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
-		assertThat(result.size()).isEqualTo(2);
-		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", DEFAULT_CRON_EXPRESSION);
-		verifyScheduleInfo(result.get(1), "test-application-2", "test-job-name-2", DEFAULT_CRON_EXPRESSION);
-	}
-
-	@Test
-	public void testListSchedulesWithAppName() {
-		setupMockResults();
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("test-application-2");
-		assertThat(result.size()).isEqualTo(1);
-		verifyScheduleInfo(result.get(0), "test-application-2", "test-job-name-2", DEFAULT_CRON_EXPRESSION);
-	}
-
-	@Test
-	public void testListSchedulesWithInvalidAppName() {
-		setupMockResults();
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list("not-here");
-		assertThat(result.size()).isEqualTo(0);
-	}
-
-	@Test
-	public void testListScheduleNoExpression() {
-		mockJobsInJobList();
-		mockAppResultsInAppList();
-		List<ScheduleInfo> result = this.cloudFoundryAppScheduler.list();
-		assertThat(result.size()).isEqualTo(2);
-		verifyScheduleInfo(result.get(0), "test-application-1", "test-job-name-1", null);
-		verifyScheduleInfo(result.get(1), "test-application-2", "test-job-name-2", null);
 	}
 
 	@Test(expected = IllegalArgumentException.class)
@@ -251,6 +170,20 @@ public class CloudFoundryAppSchedulerTests {
 		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getCommand()).isEqualTo("TestArg");
 	}
 
+	@Test(expected = UnsupportedOperationException.class)
+	public void testList() {
+		this.cloudFoundryAppScheduler.list();
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testFilteredList() {
+		this.cloudFoundryAppScheduler.list("FOO");
+	}
+
+	@Test(expected = UnsupportedOperationException.class)
+	public void testUnschedule() {
+		this.cloudFoundryAppScheduler.unschedule("FOO");
+	}
 
 	private void givenRequestListApplications(Flux<ApplicationSummary> response) {
 		given(this.operations.applications()
@@ -425,17 +358,6 @@ public class CloudFoundryAppSchedulerTests {
 				.id("test-schedule-2")
 				.jobId("test-job-2")
 				.build());
-	}
-
-	private void verifyScheduleInfo(ScheduleInfo scheduleInfo, String taskDefinitionName, String scheduleName, String expression) {
-		assertThat(scheduleInfo.getTaskDefinitionName()).isEqualTo(taskDefinitionName);
-		assertThat(scheduleInfo.getScheduleName()).isEqualTo(scheduleName);
-		if(expression != null) {
-			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(1);
-			assertThat(scheduleInfo.getScheduleProperties().get(CRON_EXPRESSION)).isEqualTo(expression);
-		} else {
-			assertThat(scheduleInfo.getScheduleProperties().size()).isEqualTo(0);
-		}
 	}
 
 	private Map<String, String> getDefaultScheduleProperties() {
