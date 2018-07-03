@@ -17,8 +17,10 @@
 package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import io.jsonwebtoken.lang.Assert;
@@ -50,6 +52,9 @@ import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 import org.springframework.cloud.scheduler.spi.core.UnScheduleException;
+import org.springframework.retry.RetryException;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 
 /**
  * A Cloud Foundry implementation of the Scheduler interface.
@@ -87,7 +92,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	public void schedule(ScheduleRequest scheduleRequest) {
 		String appName = scheduleRequest.getDefinition().getName();
 		String jobName = scheduleRequest.getScheduleName();
-		logger.debug(String.format("Scheduling: ", jobName));
+		logger.debug(String.format("Scheduling: %s", jobName));
 
 		String command = stageTask(scheduleRequest);
 
@@ -95,27 +100,15 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		Assert.hasText(cronExpression, String.format(
 				"request's scheduleProperties must have a %s that is not null nor empty",
 				SchedulerPropertyKeys.CRON_EXPRESSION));
-		int retryCount = 0;
-		boolean scheduleSuccessFlag = false;
-		while (!scheduleSuccessFlag &&
-				retryCount < this.schedulerProperties.getScheduleSSLRetryCount()) {
-			try {
-				retryCount++;
-				scheduleJob(appName, jobName, cronExpression, command);
-				scheduleSuccessFlag = true;
-			}
-			catch (CloudFoundryScheduleSSLException sle) {
-				logger.error(String.format(
-						"Failed to Schedule Task will retry. Attempt %d of %d",
-						retryCount,
-						this.schedulerProperties.getScheduleSSLRetryCount()));
-			}
-		}
+		retryTemplate().execute(e -> {
+			scheduleJob(appName, jobName, cronExpression, command);
+			return null;
+		});
 	}
 
 	@Override
 	public void unschedule(String scheduleName) {
-		logger.debug(String.format("Unscheduling: ", scheduleName));
+		logger.debug(String.format("Unscheduling: %s", scheduleName));
 		this.client.jobs().delete(DeleteJobRequest.builder()
 				.jobId(getJob(scheduleName))
 				.build())
@@ -259,6 +252,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	 * The PCF-Scheduler returns all data in pages of 50 entries.  This method
 	 * retrieves the specified page and transforms the {@link Flux} of {@link Job}s to
 	 * a {@link Flux} of {@link ScheduleInfo}s
+	 *
 	 * @param pageNumber integer containing the page offset for the {@link ScheduleInfo}s to retrieve.
 	 * @return {@link Flux} containing the {@link ScheduleInfo}s for the specified page number.
 	 */
@@ -268,9 +262,8 @@ public class CloudFoundryAppScheduler implements Scheduler {
 			return this.client.jobs().list(ListJobsRequest.builder()
 					.spaceId(requestSummary.getId())
 					.page(pageNumber)
-					.detailed(true).build()); })
-				.flatMapIterable
-						(jobs -> jobs.getResources())// iterate over the resources returned.
+					.detailed(true).build());})
+				.flatMapIterable(jobs -> jobs.getResources())// iterate over the resources returned.
 				.flatMap(job -> {
 					return getApplication(applicationSummaries,
 							job.getApplicationId()) // get the application name for each job.
@@ -319,8 +312,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 							.page(page)
 							.build()); })
 				.flatMapIterable(jobs -> jobs.getResources())
-				.filter(job ->
-						job.getName().equals(jobName))
+				.filter(job -> job.getName().equals(jobName))
 				.singleOrEmpty();// iterate over the resources returned.
 	}
 
@@ -331,8 +323,8 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	 */
 	private String getJob(String jobName) {
 		Job result = null;
-
-		for (int pageNum = PCF_PAGE_START_NUM; pageNum <= getJobPageCount(); pageNum++) {
+		final int pageCount = getJobPageCount();
+		for (int pageNum = PCF_PAGE_START_NUM; pageNum <= pageCount; pageNum++) {
 			result = getJobMono(jobName, pageNum)
 					.block();
 			if (result != null) {
@@ -343,5 +335,14 @@ public class CloudFoundryAppScheduler implements Scheduler {
 			throw new UnScheduleException(String.format("task. %s, was not found", jobName));
 		}
 		return result.getId();
+	}
+
+	private RetryTemplate retryTemplate() {
+		RetryTemplate retryTemplate = new RetryTemplate();
+		SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(
+				schedulerProperties.getScheduleSSLRetryCount(),
+				Collections.singletonMap(CloudFoundryScheduleSSLException.class, true));
+		retryTemplate.setRetryPolicy(retryPolicy);
+		return retryTemplate;
 	}
 }
