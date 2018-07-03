@@ -237,7 +237,7 @@ public class CloudFoundryAppSchedulerTests {
 			this.cloudFoundryAppScheduler.unschedule("test-job-name-3");
 		}
 		catch (SchedulerException se) {
-			assertThat(se.getMessage()).isEqualTo("Failed to unschedule task. test-job-name-3, was not found");
+			assertThat(se.getMessage()).isEqualTo("Failed to unschedule schedule test-job-name-3 does not exist.");
 			exceptionFired = true;
 		}
 		assertThat(exceptionFired).isTrue();

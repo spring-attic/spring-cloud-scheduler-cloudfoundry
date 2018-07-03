@@ -38,3 +38,7 @@ SPRING_CLOUD_DEPLOYER_CLOUDFOUNDRY_SKIP_SSL_VALIDATION
 ----
 
 Refer to `CloudFoundryConnectionProperties.java` for a complete listing.
+
+==== Integration Testing
+The integration tests have a rule that will check to see if a Cloud Foundry instance can be reached, if so then it will run the
+integration tests.  If no Cloud Foundry instance can be reached then the integration tests will be skipped.
