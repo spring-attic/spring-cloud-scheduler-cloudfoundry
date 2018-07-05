@@ -46,6 +46,22 @@ public class CloudFoundrySchedulerProperties {
 	 */
 	private int scheduleSSLRetryCount = 5;
 
+	/**
+	 * The number of seconds to wait for a unSchedule to complete.
+	 */
+	private int unScheduleTimeoutInSeconds = 30;
+
+	/**
+	 * The number of seconds to wait for a schedule to complete.
+	 * This excludes the time it takes to stage the application on Cloud Foundry.
+	 */
+	private int scheduleTimeoutInSeconds = 30;
+
+	/**
+	 * The number of seconds to wait for a list of schedules to be returned.
+	 */
+	private int listTimeoutInSeconds = 60;
+
 
 	public String getSchedulerUrl() {
 		return schedulerUrl;
@@ -61,5 +77,29 @@ public class CloudFoundrySchedulerProperties {
 
 	public void setScheduleSSLRetryCount(int scheduleSSLRetryCount) {
 		this.scheduleSSLRetryCount = scheduleSSLRetryCount;
+	}
+
+	public int getUnScheduleTimeoutInSeconds() {
+		return unScheduleTimeoutInSeconds;
+	}
+
+	public void setUnScheduleTimeoutInSeconds(int unScheduleTimeoutInSeconds) {
+		this.unScheduleTimeoutInSeconds = unScheduleTimeoutInSeconds;
+	}
+
+	public int getScheduleTimeoutInSeconds() {
+		return scheduleTimeoutInSeconds;
+	}
+
+	public void setScheduleTimeoutInSeconds(int scheduleTimeoutInSeconds) {
+		this.scheduleTimeoutInSeconds = scheduleTimeoutInSeconds;
+	}
+
+	public int getListTimeoutInSeconds() {
+		return listTimeoutInSeconds;
+	}
+
+	public void setListTimeoutInSeconds(int listTimeoutInSeconds) {
+		this.listTimeoutInSeconds = listTimeoutInSeconds;
 	}
 }

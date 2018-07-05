@@ -16,11 +16,11 @@
 
 package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import io.jsonwebtoken.lang.Assert;
@@ -52,7 +52,6 @@ import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 import org.springframework.cloud.scheduler.spi.core.UnScheduleException;
-import org.springframework.retry.RetryException;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
@@ -101,7 +100,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				"request's scheduleProperties must have a %s that is not null nor empty",
 				SchedulerPropertyKeys.CRON_EXPRESSION));
 		retryTemplate().execute(e -> {
-			scheduleJob(appName, jobName, cronExpression, command);
+			scheduleTask(appName, jobName, cronExpression, command);
 			return null;
 		});
 	}
@@ -112,7 +111,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		this.client.jobs().delete(DeleteJobRequest.builder()
 				.jobId(getJob(scheduleName))
 				.build())
-				.block();
+				.block(Duration.ofSeconds(schedulerProperties.getUnScheduleTimeoutInSeconds()));
 	}
 
 	@Override
@@ -128,7 +127,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		for (int i = PCF_PAGE_START_NUM; i <= getJobPageCount(); i++) {
 			result.addAll(getSchedules(i)
 					.collectList()
-					.block());
+					.block(Duration.ofSeconds(schedulerProperties.getListTimeoutInSeconds())));
 		}
 		return result;
 	}
@@ -136,11 +135,11 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	/**
 	 * Schedules the job for the application.
 	 * @param appName The name of the task app to be scheduled.
-	 * @param jobName the name of the job.
+	 * @param scheduleName the name of the schedule.
 	 * @param expression the cron expression.
 	 * @param command the command returned from the staging.
 	 */
-	private void scheduleJob(String appName, String jobName,
+	private void scheduleTask(String appName, String scheduleName,
 			String expression, String command) {
 		logger.debug(String.format("Scheduling Task: ", appName));
 		getApplicationByAppName(appName)
@@ -148,7 +147,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					return this.client.jobs().create(CreateJobRequest.builder()
 							.applicationId(abstractApplicationSummary.getId()) // App GUID
 							.command(command)
-							.name(jobName)
+							.name(scheduleName)
 							.build());
 				}).flatMap(createJobResponse -> {
 			return this.client.jobs().schedule(ScheduleJobRequest.
@@ -161,13 +160,13 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		})
 				.onErrorMap(e -> {
 					if (e instanceof SSLException) {
-						throw new CloudFoundryScheduleSSLException("Failed to schedule" + jobName, e);
+						throw new CloudFoundryScheduleSSLException("Failed to schedule" + scheduleName, e);
 					}
 					else {
-						throw new CreateScheduleException("Failed to schedule: " + jobName, e);
+						throw new CreateScheduleException("Failed to schedule: " + scheduleName, e);
 					}
 				})
-				.block();
+				.block(Duration.ofSeconds(schedulerProperties.getScheduleTimeoutInSeconds()));
 	}
 
 	/**
@@ -268,18 +267,18 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					return getApplication(applicationSummaries,
 							job.getApplicationId()) // get the application name for each job.
 							.map(optionalApp -> {
-								ScheduleInfo scheduleJobInfo = new ScheduleInfo();
-								scheduleJobInfo.setScheduleProperties(new HashMap<>());
-								scheduleJobInfo.setScheduleName(job.getName());
-								scheduleJobInfo.setTaskDefinitionName(optionalApp.getName());
+								ScheduleInfo scheduleInfo = new ScheduleInfo();
+								scheduleInfo.setScheduleProperties(new HashMap<>());
+								scheduleInfo.setScheduleName(job.getName());
+								scheduleInfo.setTaskDefinitionName(optionalApp.getName());
 								if (job.getJobSchedules().isPresent()) {
-									scheduleJobInfo.getScheduleProperties().put(SchedulerPropertyKeys.CRON_EXPRESSION,
+									scheduleInfo.getScheduleProperties().put(SchedulerPropertyKeys.CRON_EXPRESSION,
 											job.getJobSchedules().get().get(0).getExpression());
 								}
 								else {
 									logger.warn(String.format("Job %s does not have an associated schedule", job.getName()));
 								}
-								return scheduleJobInfo;
+								return scheduleInfo;
 							});
 				});
 	}

@@ -32,8 +32,14 @@ public class CloudFoundrySchedulerPropertiesTest {
 		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
 		props.setSchedulerUrl("testProperty");
 		props.setScheduleSSLRetryCount(10);
+		props.setListTimeoutInSeconds(5);
+		props.setUnScheduleTimeoutInSeconds(10);
+		props.setScheduleTimeoutInSeconds(15);
 		assertThat(props.getSchedulerUrl()).isEqualTo("testProperty");
 		assertThat(props.getScheduleSSLRetryCount()).isEqualTo(10);
+		assertThat(props.getScheduleTimeoutInSeconds()).isEqualTo(15);
+		assertThat(props.getUnScheduleTimeoutInSeconds()).isEqualTo(10);
+		assertThat(props.getListTimeoutInSeconds()).isEqualTo(5);
 	}
 
 	@Test
@@ -41,6 +47,9 @@ public class CloudFoundrySchedulerPropertiesTest {
 		CloudFoundrySchedulerProperties props = new CloudFoundrySchedulerProperties();
 		assertThat(props.getSchedulerUrl()).isNull();
 		assertThat(props.getScheduleSSLRetryCount()).isEqualTo(5);
+		assertThat(props.getListTimeoutInSeconds()).isEqualTo(60);
+		assertThat(props.getScheduleTimeoutInSeconds()).isEqualTo(30);
+		assertThat(props.getUnScheduleTimeoutInSeconds()).isEqualTo(30);
 	}
 
 }
