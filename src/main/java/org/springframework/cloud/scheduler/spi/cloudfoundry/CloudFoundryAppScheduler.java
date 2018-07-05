@@ -271,9 +271,9 @@ public class CloudFoundryAppScheduler implements Scheduler {
 								scheduleInfo.setScheduleProperties(new HashMap<>());
 								scheduleInfo.setScheduleName(job.getName());
 								scheduleInfo.setTaskDefinitionName(optionalApp.getName());
-								if (job.getJobSchedules().isPresent()) {
+								if (job.getJobSchedules() != null) {
 									scheduleInfo.getScheduleProperties().put(SchedulerPropertyKeys.CRON_EXPRESSION,
-											job.getJobSchedules().get().get(0).getExpression());
+											job.getJobSchedules().get(0).getExpression());
 								}
 								else {
 									logger.warn(String.format("Job %s does not have an associated schedule", job.getName()));

@@ -433,7 +433,7 @@ public class CloudFoundryAppSchedulerTests {
 				.build());
 	}
 
-	private Optional<List<JobSchedule>> createJobScheduleList(String jobId, String scheduleId) {
+	private List<JobSchedule> createJobScheduleList(String jobId, String scheduleId) {
 		List<JobSchedule> jobSchedules = new ArrayList<>();
 		jobSchedules.add(JobSchedule.builder()
 				.enabled(true)
@@ -442,7 +442,7 @@ public class CloudFoundryAppSchedulerTests {
 				.id(scheduleId)
 				.jobId(jobId)
 				.build());
-		return Optional.of(jobSchedules);
+		return jobSchedules;
 	}
 
 	private Map<String, String> getDefaultScheduleProperties() {
