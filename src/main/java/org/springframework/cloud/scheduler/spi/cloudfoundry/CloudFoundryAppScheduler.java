@@ -90,8 +90,8 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	@Override
 	public void schedule(ScheduleRequest scheduleRequest) {
 		String appName = scheduleRequest.getDefinition().getName();
-		String jobName = scheduleRequest.getScheduleName();
-		logger.debug(String.format("Scheduling: %s", jobName));
+		String scheduleName = scheduleRequest.getScheduleName();
+		logger.debug(String.format("Scheduling: %s", scheduleName));
 
 		String command = stageTask(scheduleRequest);
 
@@ -100,7 +100,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				"request's scheduleProperties must have a %s that is not null nor empty",
 				SchedulerPropertyKeys.CRON_EXPRESSION));
 		retryTemplate().execute(e -> {
-			scheduleTask(appName, jobName, cronExpression, command);
+			scheduleTask(appName, scheduleName, cronExpression, command);
 			return null;
 		});
 	}
