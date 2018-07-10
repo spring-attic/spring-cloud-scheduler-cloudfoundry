@@ -54,6 +54,9 @@ import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 import org.springframework.cloud.scheduler.spi.core.UnScheduleException;
+import org.springframework.retry.RecoveryCallback;
+import org.springframework.retry.RetryCallback;
+import org.springframework.retry.RetryContext;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 
@@ -107,11 +110,27 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		catch(ParseException pe) {
 			throw new IllegalArgumentException("Cron Expression is invalid: " + pe.getMessage());
 		}
-
-		retryTemplate().execute(e -> {
-			scheduleTask(appName, scheduleName, cronExpression, command);
-			return null;
-		});
+		retryTemplate().execute(new RetryCallback<Void, RuntimeException>() {
+					@Override
+					public Void doWithRetry(RetryContext retryContext) throws RuntimeException {
+						scheduleTask(appName, scheduleName, cronExpression, command);
+						return null;
+					}
+				},
+				new RecoveryCallback<Void>() {
+					@Override
+					public Void recover(RetryContext retryContext) throws Exception {
+						logger.error("Unable to schedule application");
+						try {
+							logger.debug("removing job portion of the schedule.");
+							unschedule(scheduleName);
+						}
+						catch (UnScheduleException ex) {
+							logger.debug("No job to be removed.");
+						}
+						throw new CreateScheduleException("Failed to schedule: " + scheduleName, retryContext.getLastThrowable());
+					}
+				});
 	}
 
 	@Override
