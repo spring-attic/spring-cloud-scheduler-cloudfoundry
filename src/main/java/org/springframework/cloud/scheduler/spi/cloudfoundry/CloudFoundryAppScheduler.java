@@ -291,7 +291,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		ListJobsResponse response = this.getSpace(this.properties.getSpace()).flatMap(requestSummary -> {
 			return this.client.jobs().list(ListJobsRequest.builder()
 					.spaceId(requestSummary.getId())
-					.detailed(true).build());
+					.detailed(false).build());
 		}).block();
 		return response.getPagination().getTotalPages();
 	}
