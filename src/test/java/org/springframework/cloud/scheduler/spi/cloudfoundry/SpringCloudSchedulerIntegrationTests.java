@@ -20,8 +20,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import io.pivotal.reactor.scheduler.ReactorSchedulerClient;
 import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.applications.DeleteApplicationRequest;
+import org.cloudfoundry.reactor.ConnectionContext;
+import org.cloudfoundry.reactor.TokenProvider;
 import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.runner.RunWith;
@@ -30,13 +33,18 @@ import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.deployer.resource.maven.MavenProperties;
+import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
+import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryDeploymentProperties;
+import org.springframework.cloud.deployer.spi.task.TaskLauncher;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 import org.springframework.cloud.scheduler.spi.test.AbstractIntegrationTests;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -97,31 +105,58 @@ public class SpringCloudSchedulerIntegrationTests extends AbstractIntegrationTes
 	 */
 	@After
 	public void tearDown() {
-		operations.applications().list().flatMap(applicationSummary -> {
-			if(applicationSummary.getName().startsWith("testList") ||
-					applicationSummary.getName().startsWith("testDuplicateSchedule") ||
-					applicationSummary.getName().startsWith("testUnschedule") ||
-					applicationSummary.getName().startsWith("testMultiple") ||
-					applicationSummary.getName().startsWith("testSimpleSchedule")) {
+		try {
+			operations.applications().list().flatMap(applicationSummary -> {
+				if (applicationSummary.getName().startsWith("testList") ||
+						applicationSummary.getName().startsWith("testDuplicateSchedule") ||
+						applicationSummary.getName().startsWith("testUnschedule") ||
+						applicationSummary.getName().startsWith("testMultiple") ||
+						applicationSummary.getName().startsWith("testSimpleSchedule")) {
 
-				return operations.applications().delete(DeleteApplicationRequest
-						.builder()
-						.name(applicationSummary.getName())
-						.build());
-			}
-			return Mono.justOrEmpty(applicationSummary);
-		}).blockLast();
+					return operations.applications().delete(DeleteApplicationRequest
+							.builder()
+							.name(applicationSummary.getName())
+							.build());
+				}
+				return Mono.justOrEmpty(applicationSummary);
+			}).blockLast();
+		} catch (Exception ex) {
+			log.warn("Attempted cleanup and exception occured: " + ex.getMessage());
+		}
 	}
 
-	/**
-	 * This triggers the use of {@link CloudFoundrySchedulerAutoConfiguration}.
-	 *
-	 * @author Glenn Renfro
-	 */
 	@Configuration
 	@EnableAutoConfiguration
 	@EnableConfigurationProperties
 	public static class Config {
+		@Bean
+		@ConditionalOnMissingBean
+		public ReactorSchedulerClient reactorSchedulerClient(ConnectionContext context,
+				TokenProvider passwordGrantTokenProvider,
+				CloudFoundrySchedulerProperties properties) {
+			return ReactorSchedulerClient.builder()
+					.connectionContext(context)
+					.tokenProvider(passwordGrantTokenProvider)
+					.root(Mono.just(properties.getSchedulerUrl()))
+					.build();
+		}
 
+		@Bean
+		@ConditionalOnMissingBean
+		public Scheduler scheduler(ReactorSchedulerClient client,
+				CloudFoundryOperations operations,
+				CloudFoundryConnectionProperties properties,
+				TaskLauncher taskLauncher,
+				CloudFoundrySchedulerProperties schedulerProperties) {
+			return new CloudFoundryAppScheduler(client, operations, properties,
+					(CloudFoundry2630AndLaterTaskLauncher) taskLauncher,
+					schedulerProperties);
+		}
+
+		@Bean
+		@ConditionalOnMissingBean
+		public CloudFoundrySchedulerProperties cloudFoundrySchedulerProperties() {
+			return new CloudFoundrySchedulerProperties();
+		}
 	}
 }
