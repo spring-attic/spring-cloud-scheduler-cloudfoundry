@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.scheduler.spi.cloudfoundry;
 
+import java.text.ParseException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +41,7 @@ import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.applications.AbstractApplicationSummary;
 import org.cloudfoundry.operations.applications.ApplicationSummary;
 import org.cloudfoundry.operations.spaces.SpaceSummary;
+import org.quartz.CronExpression;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -99,6 +101,13 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		Assert.hasText(cronExpression, String.format(
 				"request's scheduleProperties must have a %s that is not null nor empty",
 				SchedulerPropertyKeys.CRON_EXPRESSION));
+		try {
+			new CronExpression("0 " + cronExpression);
+		}
+		catch(ParseException pe) {
+			throw new IllegalArgumentException("Cron Expression is invalid: " + pe.getMessage());
+		}
+
 		retryTemplate().execute(e -> {
 			scheduleTask(appName, scheduleName, cronExpression, command);
 			return null;

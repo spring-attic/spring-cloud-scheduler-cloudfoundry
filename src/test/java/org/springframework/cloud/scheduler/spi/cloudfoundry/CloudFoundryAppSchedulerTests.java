@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import io.pivotal.scheduler.SchedulerClient;
@@ -58,7 +57,9 @@ import org.cloudfoundry.operations.applications.Applications;
 import org.cloudfoundry.operations.spaces.SpaceSummary;
 import org.cloudfoundry.operations.spaces.Spaces;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -86,7 +87,10 @@ import static org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys
  */
 public class CloudFoundryAppSchedulerTests {
 
-	public static final String DEFAULT_CRON_EXPRESSION = "* * * * *";
+	@Rule
+	public ExpectedException thrown = ExpectedException.none();
+
+	public static final String DEFAULT_CRON_EXPRESSION = "0/5 * ? * *";
 
 	@Mock(answer = Answers.RETURNS_SMART_NULLS)
 	private Applications applications;
@@ -158,6 +162,24 @@ public class CloudFoundryAppSchedulerTests {
 	}
 
 	@Test
+	public void testInvalidCron() {
+		thrown.expect(IllegalArgumentException.class);
+		thrown.expectMessage("Illegal characters for this position: 'BAD'");
+
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+
+		mockAppResultsInAppList();
+		AppDefinition definition = new AppDefinition("test-application-1", null);
+		Map badCronMap = new HashMap<String, String>();
+		badCronMap.put(CRON_EXPRESSION, "BADCRON");
+
+		ScheduleRequest request = new ScheduleRequest(definition, badCronMap, null, "test-schedule", resource);
+
+		this.cloudFoundryAppScheduler.schedule(request);
+
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse()).isNull();
+	}
+
 	public void testCreateWithCommandLineArgs() {
 		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
 
