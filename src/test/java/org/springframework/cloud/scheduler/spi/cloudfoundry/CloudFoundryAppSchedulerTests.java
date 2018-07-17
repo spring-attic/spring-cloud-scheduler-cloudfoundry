@@ -115,7 +115,11 @@ public class CloudFoundryAppSchedulerTests {
 
 	private CloudFoundryAppScheduler cloudFoundryAppScheduler;
 
+	private CloudFoundryAppScheduler noServiceCloudFoundryAppScheduler;
+
 	private SchedulerClient client;
+
+	private SchedulerClient noServiceClient;
 
 	private CloudFoundryConnectionProperties properties = new CloudFoundryConnectionProperties();
 
@@ -134,9 +138,13 @@ public class CloudFoundryAppSchedulerTests {
 		given(this.operations.spaces()).willReturn(this.spaces);
 
 		this.client = new TestSchedulerClient();
+		this.noServiceClient = new NoServiceTestSchedulerClient();
 
 		this.cloudFoundryAppScheduler = new CloudFoundryAppScheduler(this.client, this.operations,
 				this.properties, taskLauncher, schedulerProperties);
+		this.noServiceCloudFoundryAppScheduler = new CloudFoundryAppScheduler(this.noServiceClient, this.operations,
+				this.properties, taskLauncher, schedulerProperties);
+
 	}
 
 	@Test(expected = IllegalArgumentException.class)
@@ -265,6 +273,33 @@ public class CloudFoundryAppSchedulerTests {
 		assertThat(exceptionFired).isTrue();
 	}
 
+	@Test
+	public void testNoServiceList() {
+		thrown.expect(SchedulerException.class);
+		thrown.expectMessage("Scheduler Service returned a null response.");
+		this.noServiceCloudFoundryAppScheduler.list();
+	}
+
+	@Test
+	public void testNoServiceListSchedulesWithAppName() {
+		thrown.expect(SchedulerException.class);
+		thrown.expectMessage("Scheduler Service returned a null response.");
+		this.noServiceCloudFoundryAppScheduler.list("test-application-2");
+	}
+
+	@Test
+	public void testNoServiceCreate() {
+		thrown.expect(SchedulerException.class);
+		thrown.expectMessage("Scheduler Service returned a null response.");
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+
+		mockAppResultsInAppList();
+		AppDefinition definition = new AppDefinition("test-application-1", null);
+		ScheduleRequest request = new ScheduleRequest(definition, getDefaultScheduleProperties(), null, "test-schedule", resource);
+
+		this.noServiceCloudFoundryAppScheduler.schedule(request);
+	}
+
 	private void givenRequestListApplications(Flux<ApplicationSummary> response) {
 		given(this.operations.applications()
 				.list())
@@ -298,6 +333,36 @@ public class CloudFoundryAppSchedulerTests {
 		@Override
 		public Jobs jobs() {
 			return jobs;
+		}
+	}
+
+	private static class NoServiceTestSchedulerClient implements SchedulerClient {
+		private Jobs jobs;
+
+		public NoServiceTestSchedulerClient() {
+			jobs = new NoServiceTestJobs();
+		}
+
+		@Override
+		public Calls calls() {
+			return null;
+		}
+
+		@Override
+		public Jobs jobs() {
+			return jobs;
+		}
+	}
+
+	private static class NoServiceTestJobs extends TestJobs {
+		@Override
+		public Mono<ListJobsResponse> list(ListJobsRequest request) {
+			return Mono.justOrEmpty(null);
+		}
+
+		@Override
+		public Mono<CreateJobResponse> create(CreateJobRequest request) {
+			return Mono.justOrEmpty(null);
 		}
 	}
 
