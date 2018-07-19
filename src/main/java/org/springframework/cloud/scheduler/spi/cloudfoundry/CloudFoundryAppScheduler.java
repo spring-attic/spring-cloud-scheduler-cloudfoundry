@@ -68,7 +68,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 
 	private final static int PCF_PAGE_START_NUM = 1; //First PageNum for PCFScheduler starts at 1.
 
-	private final static String SCHEDULER_SERVICE_ERROR_MESSAGE = "Scheduler Service did not return a response.  Is the scheduler service installed?";
+	private final static String SCHEDULER_SERVICE_ERROR_MESSAGE = "Scheduler Service returned a null response.";
 
 	protected final static Log logger = LogFactory.getLog(CloudFoundryAppScheduler.class);
 	private final SchedulerClient client;

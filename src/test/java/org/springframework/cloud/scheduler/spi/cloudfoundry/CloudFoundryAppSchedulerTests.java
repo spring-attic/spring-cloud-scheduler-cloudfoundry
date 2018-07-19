@@ -276,21 +276,21 @@ public class CloudFoundryAppSchedulerTests {
 	@Test
 	public void testNoServiceList() {
 		thrown.expect(SchedulerException.class);
-		thrown.expectMessage("Scheduler Service did not return a response.  Is the scheduler service installed?");
+		thrown.expectMessage("Scheduler Service returned a null response.");
 		this.noServiceCloudFoundryAppScheduler.list();
 	}
 
 	@Test
 	public void testNoServiceListSchedulesWithAppName() {
 		thrown.expect(SchedulerException.class);
-		thrown.expectMessage("Scheduler Service did not return a response.  Is the scheduler service installed?");
+		thrown.expectMessage("Scheduler Service returned a null response.");
 		this.noServiceCloudFoundryAppScheduler.list("test-application-2");
 	}
 
 	@Test
 	public void testNoServiceCreate() {
 		thrown.expect(SchedulerException.class);
-		thrown.expectMessage("Scheduler Service did not return a response.  Is the scheduler service installed?");
+		thrown.expectMessage("Scheduler Service returned a null response.");
 		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
 
 		mockAppResultsInAppList();
