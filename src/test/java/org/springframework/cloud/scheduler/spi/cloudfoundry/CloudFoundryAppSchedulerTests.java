@@ -70,6 +70,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDefinition;
+import org.springframework.cloud.scheduler.spi.core.CreateScheduleException;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.SchedulerException;
@@ -91,6 +92,10 @@ public class CloudFoundryAppSchedulerTests {
 	public ExpectedException thrown = ExpectedException.none();
 
 	public static final String DEFAULT_CRON_EXPRESSION = "0/5 * ? * *";
+
+	public static final String CRON_EXPRESSION_FOR_SIX_MIN = "0/6 * ? * *";
+
+	public static final String BAD_CRON_EXPRESSION = "FOOBAD";
 
 	@Mock(answer = Answers.RETURNS_SMART_NULLS)
 	private Applications applications;
@@ -172,14 +177,14 @@ public class CloudFoundryAppSchedulerTests {
 	@Test
 	public void testInvalidCron() {
 		thrown.expect(IllegalArgumentException.class);
-		thrown.expectMessage("Illegal characters for this position: 'BAD'");
+		thrown.expectMessage("Illegal characters for this position: 'FOO'");
 
 		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
 
 		mockAppResultsInAppList();
 		AppDefinition definition = new AppDefinition("test-application-1", null);
 		Map badCronMap = new HashMap<String, String>();
-		badCronMap.put(CRON_EXPRESSION, "BADCRON");
+		badCronMap.put(CRON_EXPRESSION, BAD_CRON_EXPRESSION);
 
 		ScheduleRequest request = new ScheduleRequest(definition, badCronMap, null, "test-schedule", resource);
 
@@ -188,6 +193,25 @@ public class CloudFoundryAppSchedulerTests {
 		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse()).isNull();
 	}
 
+	@Test
+	public void testSuccessJobCreateFailedSchedule() {
+		thrown.expect(CreateScheduleException.class);
+
+		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
+
+		mockAppResultsInAppList();
+		AppDefinition definition = new AppDefinition("test-application-1", null);
+		Map badCronMap = new HashMap<String, String>();
+		badCronMap.put(CRON_EXPRESSION, CRON_EXPRESSION_FOR_SIX_MIN);
+		ScheduleRequest request = new ScheduleRequest(definition, badCronMap, null, "test-schedule", resource);
+
+		this.cloudFoundryAppScheduler.schedule(request);
+
+		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse()).isNull();
+	}
+
+
+	@Test
 	public void testCreateWithCommandLineArgs() {
 		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");
 
@@ -381,6 +405,11 @@ public class CloudFoundryAppSchedulerTests {
 					.id("test-job-id-1")
 					.command(request.getCommand())
 					.build();
+			this.jobResources.add(Job.builder().applicationId(request.getApplicationId())
+					.command(request.getCommand())
+					.id("test-job-1")
+					.name(request.getName())
+					.build());
 			return Mono.just(createJobResponse);
 		}
 
@@ -440,6 +469,9 @@ public class CloudFoundryAppSchedulerTests {
 
 		@Override
 		public Mono<ScheduleJobResponse> schedule(ScheduleJobRequest request) {
+			if(request.getExpression().equals(CRON_EXPRESSION_FOR_SIX_MIN)) {
+				throw new IllegalStateException();
+			}
 			return Mono.just(ScheduleJobResponse.builder().expression(request.getExpression())
 					.expressionType(request.getExpressionType())
 					.enabled(true)
@@ -449,6 +481,9 @@ public class CloudFoundryAppSchedulerTests {
 		}
 
 		public CreateJobResponse getCreateJobResponse() {
+			if(this.jobResources.size() == 0) {
+				this.createJobResponse = null;
+			}
 			return createJobResponse;
 		}
 	}
