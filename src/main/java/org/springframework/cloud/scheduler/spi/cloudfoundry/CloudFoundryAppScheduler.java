@@ -132,7 +132,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 						catch (UnScheduleException ex) {
 							logger.debug("No job to be removed.");
 						}
-						throw new CreateScheduleException("Failed to schedule: " + scheduleName, retryContext.getLastThrowable());
+						throw new CreateScheduleException(scheduleName, retryContext.getLastThrowable());
 					}
 				});
 	}
