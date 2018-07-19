@@ -12,13 +12,13 @@
 	<parent>
 		<groupId>org.springframework.cloud</groupId>
 		<artifactId>spring-cloud-scheduler-parent</artifactId>
-		<version>1.0.0.M2</version>
+		<version>1.0.0.RC1</version>
 		<relativePath />
 	</parent>
 
 	<properties>
 		<java.version>1.8</java.version>
-		<spring-cloud-scheduler-spi.version>1.0.0.M2</spring-cloud-scheduler-spi.version>
+		<spring-cloud-scheduler-spi.version>1.0.0.RC1</spring-cloud-scheduler-spi.version>
 		<cloudfoundry-java-lib.version>3.12.0.RELEASE</cloudfoundry-java-lib.version>
 		<reactor-core.version>3.1.8.RELEASE</reactor-core.version>
 		<reactor-netty.version>0.7.8.RELEASE</reactor-netty.version>
