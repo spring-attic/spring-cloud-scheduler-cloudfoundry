@@ -32,6 +32,7 @@ import io.pivotal.scheduler.v1.jobs.Job;
 import io.pivotal.scheduler.v1.jobs.ListJobsRequest;
 import io.pivotal.scheduler.v1.jobs.ListJobsResponse;
 import io.pivotal.scheduler.v1.jobs.ScheduleJobRequest;
+import io.pivotal.scheduler.v1.jobs.ScheduleJobResponse;
 import io.pivotal.scheduler.v1.schedules.ExpressionType;
 import javax.net.ssl.SSLException;
 import org.apache.commons.logging.Log;
@@ -52,6 +53,7 @@ import org.springframework.cloud.scheduler.spi.core.CreateScheduleException;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
 import org.springframework.cloud.scheduler.spi.core.Scheduler;
+import org.springframework.cloud.scheduler.spi.core.SchedulerException;
 import org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys;
 import org.springframework.cloud.scheduler.spi.core.UnScheduleException;
 import org.springframework.retry.policy.SimpleRetryPolicy;
@@ -65,6 +67,8 @@ import org.springframework.retry.support.RetryTemplate;
 public class CloudFoundryAppScheduler implements Scheduler {
 
 	private final static int PCF_PAGE_START_NUM = 1; //First PageNum for PCFScheduler starts at 1.
+
+	private final static String SCHEDULER_SERVICE_ERROR_MESSAGE = "Scheduler Service returned a null response.";
 
 	protected final static Log logger = LogFactory.getLog(CloudFoundryAppScheduler.class);
 	private final SchedulerClient client;
@@ -134,9 +138,13 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	public List<ScheduleInfo> list() {
 		List<ScheduleInfo> result = new ArrayList<>();
 		for (int i = PCF_PAGE_START_NUM; i <= getJobPageCount(); i++) {
-			result.addAll(getSchedules(i)
+			List<ScheduleInfo> scheduleInfoPage = getSchedules(i)
 					.collectList()
-					.block(Duration.ofSeconds(schedulerProperties.getListTimeoutInSeconds())));
+					.block(Duration.ofSeconds(schedulerProperties.getListTimeoutInSeconds()));
+			if(scheduleInfoPage == null) {
+				throw new SchedulerException(SCHEDULER_SERVICE_ERROR_MESSAGE);
+			}
+			result.addAll(scheduleInfoPage);
 		}
 		return result;
 	}
@@ -151,7 +159,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 	private void scheduleTask(String appName, String scheduleName,
 			String expression, String command) {
 		logger.debug(String.format("Scheduling Task: ", appName));
-		getApplicationByAppName(appName)
+		ScheduleJobResponse response = getApplicationByAppName(appName)
 				.flatMap(abstractApplicationSummary -> {
 					return this.client.jobs().create(CreateJobRequest.builder()
 							.applicationId(abstractApplicationSummary.getId()) // App GUID
@@ -176,6 +184,9 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					}
 				})
 				.block(Duration.ofSeconds(schedulerProperties.getScheduleTimeoutInSeconds()));
+		if(response == null) {
+			throw new SchedulerException(SCHEDULER_SERVICE_ERROR_MESSAGE);
+		}
 	}
 
 	/**
@@ -302,6 +313,9 @@ public class CloudFoundryAppScheduler implements Scheduler {
 					.spaceId(requestSummary.getId())
 					.detailed(false).build());
 		}).block();
+		if(response == null) {
+			throw new SchedulerException(SCHEDULER_SERVICE_ERROR_MESSAGE);
+		}
 		return response.getPagination().getTotalPages();
 	}
 
