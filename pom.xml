@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<artifactId>spring-cloud-scheduler-cloudfoundry</artifactId>
-	<version>1.0.0.BUILD-SNAPSHOT</version>
+	<version>1.1.0.BUILD-SNAPSHOT</version>
 	<groupId>org.springframework.cloud</groupId>
 	<packaging>jar</packaging>
 
@@ -12,20 +12,19 @@
 	<parent>
 		<groupId>org.springframework.cloud</groupId>
 		<artifactId>spring-cloud-scheduler-parent</artifactId>
-		<version>1.0.0.RELEASE</version>
+		<version>1.1.0.BUILD-SNAPSHOT</version>
 		<relativePath />
 	</parent>
 
 	<properties>
 		<java.version>1.8</java.version>
-		<spring-cloud-scheduler-spi.version>1.0.0.RELEASE</spring-cloud-scheduler-spi.version>
+		<spring-cloud-scheduler-spi.version>1.1.0.BUILD-SNAPSHOT</spring-cloud-scheduler-spi.version>
 		<cloudfoundry-java-lib.version>3.12.0.RELEASE</cloudfoundry-java-lib.version>
 		<reactor-core.version>3.1.8.RELEASE</reactor-core.version>
 		<reactor-netty.version>0.7.8.RELEASE</reactor-netty.version>
 		<pivotal-cf-client-reactor.version>1.1.0.RELEASE</pivotal-cf-client-reactor.version>
 		<deployer.version>1.3.3.RELEASE</deployer.version>
 		<spring-cloud-deployer-cloud-foundry.version>1.4.1.RELEASE</spring-cloud-deployer-cloud-foundry.version>
-		<quartz.version>2.3.0</quartz.version>
 	</properties>
 
 	<dependencies>
@@ -106,11 +105,6 @@
 		<dependency>
 			<groupId>org.springframework.retry</groupId>
 			<artifactId>spring-retry</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.quartz-scheduler</groupId>
-			<artifactId>quartz</artifactId>
-			<version>${quartz.version}</version>
 		</dependency>
 	</dependencies>
 
