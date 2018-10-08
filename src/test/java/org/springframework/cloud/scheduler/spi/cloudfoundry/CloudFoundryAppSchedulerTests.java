@@ -176,7 +176,7 @@ public class CloudFoundryAppSchedulerTests {
 
 	@Test
 	public void testInvalidCron() {
-		thrown.expect(IllegalArgumentException.class);
+		thrown.expect(CreateScheduleException.class);
 		thrown.expectMessage("Illegal characters for this position: 'FOO'");
 
 		Resource resource = new FileSystemResource("src/test/resources/demo-0.0.1-SNAPSHOT.jar");

@@ -112,7 +112,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 			new QuartzCronExpression("0 " + cronExpression);
 		}
 		catch(ParseException pe) {
-			throw new IllegalArgumentException("Cron Expression is invalid: " + pe.getMessage());
+			throw new CreateScheduleException("Cron Expression is invalid: " + pe.getMessage(), pe);
 		}
 		retryTemplate().execute(new RetryCallback<Void, RuntimeException>() {
 					@Override
