@@ -42,13 +42,13 @@ import org.cloudfoundry.operations.CloudFoundryOperations;
 import org.cloudfoundry.operations.applications.AbstractApplicationSummary;
 import org.cloudfoundry.operations.applications.ApplicationSummary;
 import org.cloudfoundry.operations.spaces.SpaceSummary;
-import org.quartz.CronExpression;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDeploymentRequest;
+import org.springframework.cloud.scheduler.spi.cloudfoundry.expression.QuartzCronExpression;
 import org.springframework.cloud.scheduler.spi.core.CreateScheduleException;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
@@ -109,7 +109,7 @@ public class CloudFoundryAppScheduler implements Scheduler {
 				"request's scheduleProperties must have a %s that is not null nor empty",
 				SchedulerPropertyKeys.CRON_EXPRESSION));
 		try {
-			new CronExpression("0 " + cronExpression);
+			new QuartzCronExpression("0 " + cronExpression);
 		}
 		catch(ParseException pe) {
 			throw new IllegalArgumentException("Cron Expression is invalid: " + pe.getMessage());
