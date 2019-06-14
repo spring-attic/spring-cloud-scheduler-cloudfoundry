@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -219,7 +219,8 @@ public class CloudFoundryAppScheduler implements Scheduler {
 		AppDeploymentRequest request = new AppDeploymentRequest(
 				scheduleRequest.getDefinition(),
 				scheduleRequest.getResource(),
-				scheduleRequest.getDeploymentProperties());
+				scheduleRequest.getDeploymentProperties(),
+				scheduleRequest.getCommandlineArguments());
 		SummaryApplicationResponse response = taskLauncher.stage(request);
 		return taskLauncher.getCommand(response, request);
 	}
