@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -70,6 +71,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundry2630AndLaterTaskLauncher;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
 import org.springframework.cloud.deployer.spi.core.AppDefinition;
+import org.springframework.cloud.deployer.spi.core.AppDeploymentRequest;
 import org.springframework.cloud.scheduler.spi.core.CreateScheduleException;
 import org.springframework.cloud.scheduler.spi.core.ScheduleInfo;
 import org.springframework.cloud.scheduler.spi.core.ScheduleRequest;
@@ -78,13 +80,16 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.cloud.scheduler.spi.core.SchedulerPropertyKeys.CRON_EXPRESSION;
 
 /**
  * Test the core features of the Spring Cloud Scheduler implementation.
  *
  * @author Glenn Renfro
+ * @author Ilayaperumal Gopinathan
  */
 public class CloudFoundryAppSchedulerTests {
 
@@ -220,13 +225,10 @@ public class CloudFoundryAppSchedulerTests {
 		ScheduleRequest request = new ScheduleRequest(definition,
 				getDefaultScheduleProperties(), null,
 				Collections.singletonList("TestArg"), "test-schedule", resource);
-		given(this.taskLauncher.getCommand(Mockito.any(), Mockito.any()))
-				.willReturn("TestArg");
-
 		this.cloudFoundryAppScheduler.schedule(request);
-		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getId()).isEqualTo("test-job-id-1");
-		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getApplicationId()).isEqualTo("test-application-id-1");
-		assertThat(((TestJobs) this.client.jobs()).getCreateJobResponse().getCommand()).isEqualTo("TestArg");
+		ArgumentCaptor<AppDeploymentRequest> argumentCaptor = ArgumentCaptor.forClass(AppDeploymentRequest.class);
+		verify(this.taskLauncher).stage(argumentCaptor.capture());
+		assertEquals("TestArg", argumentCaptor.getValue().getCommandlineArguments().get(0));
 	}
 
 	@Test
