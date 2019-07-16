@@ -27,11 +27,12 @@ import org.cloudfoundry.reactor.doppler.ReactorDopplerClient;
 import org.cloudfoundry.reactor.tokenprovider.PasswordGrantTokenProvider;
 import org.cloudfoundry.reactor.uaa.ReactorUaaClient;
 
+import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.deployer.spi.cloudfoundry.CloudFoundryConnectionProperties;
-import org.springframework.cloud.scheduler.spi.junit.AbstractExternalResourceTestSupport;
+import org.springframework.cloud.scheduler.spi.test.junit.AbstractExternalResourceTestSupport;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,7 +57,7 @@ public class CloudFoundryTestSupport extends AbstractExternalResourceTestSupport
 
 	@Override
 	protected void obtainResource() throws Exception {
-		context = new SpringApplicationBuilder(Config.class).web(false).run();
+		context = new SpringApplicationBuilder(Config.class).web(WebApplicationType.NONE).run();
 		resource = context.getBean(CloudFoundryClient.class);
 	}
 
