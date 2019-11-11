@@ -20,8 +20,6 @@
 		<java.version>1.8</java.version>
 		<spring-cloud-scheduler-spi.version>2.0.0.RELEASE</spring-cloud-scheduler-spi.version>
 		<cloudfoundry-java-lib.version>3.17.1.RELEASE</cloudfoundry-java-lib.version>
-		<reactor-core.version>3.2.12.RELEASE</reactor-core.version>
-		<reactor-netty.version>0.7.15.RELEASE</reactor-netty.version>
 		<pivotal-cf-client-reactor.version>1.2.0.RELEASE</pivotal-cf-client-reactor.version>
 		<deployer.version>2.0.4.RELEASE</deployer.version>
 		<spring-cloud-deployer-cloud-foundry.version>2.0.8.RELEASE</spring-cloud-deployer-cloud-foundry.version>
@@ -60,16 +58,6 @@
 			<groupId>org.cloudfoundry</groupId>
 			<artifactId>cloudfoundry-operations</artifactId>
 			<version>${cloudfoundry-java-lib.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.projectreactor</groupId>
-			<artifactId>reactor-core</artifactId>
-			<version>${reactor-core.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.projectreactor.ipc</groupId>
-			<artifactId>reactor-netty</artifactId>
-			<version>${reactor-netty.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
