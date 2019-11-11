@@ -12,19 +12,19 @@
 	<parent>
 		<groupId>org.springframework.cloud</groupId>
 		<artifactId>spring-cloud-scheduler-parent</artifactId>
-		<version>2.0.1.BUILD-SNAPSHOT</version>
+		<version>2.0.0.RELEASE</version>
 		<relativePath />
 	</parent>
 
 	<properties>
 		<java.version>1.8</java.version>
-		<spring-cloud-scheduler-spi.version>2.0.1.BUILD-SNAPSHOT</spring-cloud-scheduler-spi.version>
-		<cloudfoundry-java-lib.version>3.17.0.RELEASE</cloudfoundry-java-lib.version>
+		<spring-cloud-scheduler-spi.version>2.0.0.RELEASE</spring-cloud-scheduler-spi.version>
+		<cloudfoundry-java-lib.version>3.17.1.RELEASE</cloudfoundry-java-lib.version>
 		<reactor-core.version>3.2.12.RELEASE</reactor-core.version>
 		<reactor-netty.version>0.7.15.RELEASE</reactor-netty.version>
 		<pivotal-cf-client-reactor.version>1.2.0.RELEASE</pivotal-cf-client-reactor.version>
-		<deployer.version>2.0.4.BUILD-SNAPSHOT</deployer.version>
-		<spring-cloud-deployer-cloud-foundry.version>2.0.8.BUILD-SNAPSHOT</spring-cloud-deployer-cloud-foundry.version>
+		<deployer.version>2.0.4.RELEASE</deployer.version>
+		<spring-cloud-deployer-cloud-foundry.version>2.0.8.RELEASE</spring-cloud-deployer-cloud-foundry.version>
 	</properties>
 
 	<dependencies>
