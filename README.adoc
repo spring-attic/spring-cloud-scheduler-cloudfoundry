@@ -1,3 +1,5 @@
+# spring-cloud-scheduler-cloudfoundry is no longer actively maintained by VMware, Inc.
+
 == Spring Cloud Scheduler Cloud Foundry image:https://build.spring.io/plugins/servlet/wittified/build-status/SCD-SMC[Build Status, link=https://build.spring.io/browse/SCD-SMC] image:https://badge.waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry.svg?label=ready&title=Ready[Stories Ready, link=https://waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry] image:https://badge.waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry.svg?label=In%20Progress&title=In%20Progress[Stories In Progress, link=https://waffle.io/spring-cloud/spring-cloud-scheduler-cloudfoundry]
 
 The Spring Cloud Scheduler Cloud Foundry project provides a means to schedule short lived tasks to Cloud Foundry based on the Spring Cloud Scheduler SPI.
